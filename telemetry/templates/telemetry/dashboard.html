@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aquaculture AI Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .grid { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 200px; text-align: center; }
+        .card h3 { margin: 0 0 10px 0; color: #666; font-size: 1.1rem; }
+        .card .value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
+        .status-safe { background-color: #d4edda; border: 2px solid #28a745; }
+        .status-danger { background-color: #f8d7da; border: 2px solid #dc3545; }
+        
+        /* Styling for the chart container */
+        .chart-container { width: 100%; max-width: 900px; margin: 0 auto 40px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden;}
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #2c3e50; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Intelligent Aquaculture Management System</h1>
+        <p>Real-Time Environmental Telemetry & AI Prediction</p>
+    </div>
+
+    {% if latest %}
+    <div class="grid">
+        <div class="card">
+            <h3>Temperature</h3>
+            <div class="value">{{ latest.temperature }} °C</div>
+        </div>
+        <div class="card">
+            <h3>pH Level</h3>
+            <div class="value">{{ latest.ph_level }}</div>
+        </div>
+        <div class="card">
+            <h3>Turbidity</h3>
+            <div class="value">{{ latest.turbidity }} NTU</div>
+        </div>
+        
+        <div class="card {% if latest.is_safe %}status-safe{% else %}status-danger{% endif %}">
+            <h3>AI System Status</h3>
+            <div class="value">
+                {% if latest.is_safe %}
+                    SAFE
+                {% else %}
+                    WARNING
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="width: 100%; max-width: 860px; margin: 0 auto 30px auto; display: flex; justify-content: space-between; align-items: center; text-align: left;">
+        <div>
+            <h3 style="margin: 0; color: #2c3e50;">Manual Override Control</h3>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 0.95rem;">Initiate a 5-second relay sequence on the physical node.</p>
+        </div>
+        <form method="POST" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="toggle_water_change" value="true">
+            <button type="submit" 
+                    style="background-color: {% if water_change_requested %}#6c757d{% else %}#007bff{% endif %}; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 1rem; cursor: pointer; font-weight: bold;"
+                    {% if water_change_requested %}disabled{% endif %}>
+                {% if water_change_requested %}
+                    Command Queued (Waiting for ESP32)
+                {% else %}
+                    Initiate Water Change
+                {% endif %}
+            </button>
+        </form>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="telemetryChart"></canvas>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Temp (°C)</th>
+                <th>pH</th>
+                <th>Turbidity</th>
+                <th>AI Evaluation</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reading in history %}
+            <tr>
+                <td>{{ reading.timestamp|date:"M d, Y H:i:s" }}</td>
+                <td>{{ reading.temperature }}</td>
+                <td>{{ reading.ph_level }}</td>
+                <td>{{ reading.turbidity }}</td>
+                <td>{% if reading.is_safe %}Safe{% else %}Failure{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        const ctx = document.getElementById('telemetryChart').getContext('2d');
+        
+        const labels = [{% for r in history reversed %} "{{ r.timestamp|time:'H:i' }}", {% endfor %}];
+        const tempData = [{% for r in history reversed %} {{ r.temperature }}, {% endfor %}];
+        const phData = [{% for r in history reversed %} {{ r.ph_level }}, {% endfor %}];
+        const turbData = [{% for r in history reversed %} {{ r.turbidity }}, {% endfor %}];
+
+        const telemetryChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: tempData,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        tension: 0.3,
+                        yAxisID: 'y' 
+                    },
+                    {
+                        label: 'pH Level',
+                        data: phData,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        tension: 0.3,
+                        yAxisID: 'y1' 
+                    },
+                    {
+                        label: 'Turbidity (NTU)',
+                        data: turbData,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.3,
+                        yAxisID: 'y2' 
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { 
+                        type: 'linear', 
+                        display: true, 
+                        position: 'left',
+                        title: { display: true, text: 'Temperature (°C)' }
+                    },
+                    y1: { 
+                        type: 'linear', 
+                        display: true, 
+                        position: 'right',
+                        title: { display: true, text: 'pH Level' },
+                        grid: { drawOnChartArea: false } 
+                    },
+                    y2: { 
+                        type: 'linear', 
+                        display: true, 
+                        position: 'right',
+                        title: { display: true, text: 'Turbidity (NTU)' },
+                        grid: { drawOnChartArea: false } 
+                    }
+                }
+            }
+        });
+    </script>
+    {% else %}
+        <p style="text-align: center;">No sensor data received yet. Waiting for ESP32 telemetry...</p>
+    {% endif %}
+
+</body>
+</html>
