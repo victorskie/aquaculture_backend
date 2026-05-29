@@ -6,6 +6,7 @@ url = 'http://127.0.0.1:8000/api/telemetry/upload/'
 
 # Generating some realistic fake data for the fish pond
 payload = {
+    "node_name": "Node B",
     "temperature": round(random.uniform(26.0, 31.0), 2),
     "ph_level": round(random.uniform(6.5, 8.0), 2),
     "turbidity": round(random.uniform(30.0, 60.0), 2)

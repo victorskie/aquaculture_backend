@@ -7,17 +7,17 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 30px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .node-alert { text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; padding: 10px; border-radius: 8px; background: #fff3cd; color: #856404; max-width: 400px; margin-left: auto; margin-right: auto; border: 1px solid #ffeeba; }
         .grid { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 200px; text-align: center; }
         .card h3 { margin: 0 0 10px 0; color: #666; font-size: 1.1rem; }
         .card .value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
         .status-safe { background-color: #d4edda; border: 2px solid #28a745; }
         .status-danger { background-color: #f8d7da; border: 2px solid #dc3545; }
-        
-        /* Styling for the chart container */
-        .chart-container { width: 100%; max-width: 900px; margin: 0 auto 40px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
+        .charts-wrapper { display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto 40px auto; }
+        .chart-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;}
+        .chart-title { text-align: center; margin-top: 0; color: #2c3e50; font-size: 1.2rem; }
         table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden;}
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #2c3e50; color: white; }
@@ -27,40 +27,41 @@
 
     <div class="header">
         <h1>Intelligent Aquaculture Management System</h1>
-        <p>Real-Time Environmental Telemetry & AI Prediction</p>
+        <p>Predictive Dual-Node Telemetry & AI Evaluation</p>
     </div>
 
-    {% if latest %}
+    {% if display_node %}
+    
+    <div class="node-alert">
+        Currently Displaying: {{ display_node.node_name }}
+    </div>
+
     <div class="grid">
         <div class="card">
             <h3>Temperature</h3>
-            <div class="value">{{ latest.temperature }} °C</div>
+            <div class="value">{{ display_node.temperature }} °C</div>
         </div>
         <div class="card">
             <h3>pH Level</h3>
-            <div class="value">{{ latest.ph_level }}</div>
+            <div class="value">{{ display_node.ph_level }}</div>
         </div>
         <div class="card">
             <h3>Turbidity</h3>
-            <div class="value">{{ latest.turbidity }} NTU</div>
+            <div class="value">{{ display_node.turbidity }} NTU</div>
         </div>
         
-        <div class="card {% if latest.is_safe %}status-safe{% else %}status-danger{% endif %}">
+        <div class="card {% if display_node.is_safe %}status-safe{% else %}status-danger{% endif %}">
             <h3>AI System Status</h3>
             <div class="value">
-                {% if latest.is_safe %}
-                    SAFE
-                {% else %}
-                    WARNING
-                {% endif %}
+                {% if display_node.is_safe %}SAFE{% else %}WARNING{% endif %}
             </div>
         </div>
     </div>
 
     <div class="card" style="width: 100%; max-width: 860px; margin: 0 auto 30px auto; display: flex; justify-content: space-between; align-items: center; text-align: left;">
         <div>
-            <h3 style="margin: 0; color: #2c3e50;">Manual Override Control</h3>
-            <p style="margin: 5px 0 0 0; color: #666; font-size: 0.95rem;">Initiate a 5-second relay sequence on the physical node.</p>
+            <h3 style="margin: 0; color: #2c3e50;">Manual Override Control (Master Node)</h3>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 0.95rem;">Initiate a 5-second relay sequence on GPIO 32.</p>
         </div>
         <form method="POST" style="margin: 0;">
             {% csrf_token %}
@@ -68,23 +69,27 @@
             <button type="submit" 
                     style="background-color: {% if water_change_requested %}#6c757d{% else %}#007bff{% endif %}; color: white; border: none; padding: 12px 24px; border-radius: 5px; font-size: 1rem; cursor: pointer; font-weight: bold;"
                     {% if water_change_requested %}disabled{% endif %}>
-                {% if water_change_requested %}
-                    Command Queued (Waiting for ESP32)
-                {% else %}
-                    Initiate Water Change
-                {% endif %}
+                {% if water_change_requested %}Command Queued...{% else %}Initiate Water Change{% endif %}
             </button>
         </form>
     </div>
 
-    <div class="chart-container">
-        <canvas id="telemetryChart"></canvas>
+    <div class="charts-wrapper">
+        <div class="chart-container">
+            <h3 class="chart-title">Node A Telemetry</h3>
+            <canvas id="chartNodeA"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3 class="chart-title">Node B Telemetry</h3>
+            <canvas id="chartNodeB"></canvas>
+        </div>
     </div>
 
     <table>
         <thead>
             <tr>
                 <th>Timestamp</th>
+                <th>Location</th>
                 <th>Temp (°C)</th>
                 <th>pH</th>
                 <th>Turbidity</th>
@@ -92,9 +97,10 @@
             </tr>
         </thead>
         <tbody>
-            {% for reading in history %}
+            {% for reading in history|slice:":10" %}
             <tr>
-                <td>{{ reading.timestamp|date:"M d, Y H:i:s" }}</td>
+                <td>{{ reading.timestamp|date:"H:i:s" }}</td>
+                <td><strong>{{ reading.node_name }}</strong></td>
                 <td>{{ reading.temperature }}</td>
                 <td>{{ reading.ph_level }}</td>
                 <td>{{ reading.turbidity }}</td>
@@ -105,70 +111,73 @@
     </table>
 
     <script>
-        const ctx = document.getElementById('telemetryChart').getContext('2d');
+        const ctxA = document.getElementById('chartNodeA').getContext('2d');
+        const ctxB = document.getElementById('chartNodeB').getContext('2d');
         
-        const labels = [{% for r in history reversed %} "{{ r.timestamp|time:'H:i' }}", {% endfor %}];
-        const tempData = [{% for r in history reversed %} {{ r.temperature }}, {% endfor %}];
-        const phData = [{% for r in history reversed %} {{ r.ph_level }}, {% endfor %}];
-        const turbData = [{% for r in history reversed %} {{ r.turbidity }}, {% endfor %}];
+        // Force crisp fonts
+        Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+        Chart.defaults.font.size = 11;
 
-        const telemetryChart = new Chart(ctx, {
+        // 1. Extract and format the raw data from Django
+        const rawData = [
+            {% for r in history reversed %}
+            { 
+                time: "{{ r.timestamp|time:'H:i:s' }}", 
+                node: "{{ r.node_name }}", 
+                temp: {{ r.temperature }}, 
+                ph: {{ r.ph_level }}, 
+                turb: {{ r.turbidity }} 
+            },
+            {% endfor %}
+        ];
+
+        // 2. Get unique timestamps for the X-axis
+        const labels = [...new Set(rawData.map(d => d.time))];
+
+        // 3. Helper function to map values
+        const getValues = (nodeName, key) => labels.map(label => {
+            const match = rawData.find(d => d.time === label && d.node === nodeName);
+            return match ? match[key] : null;
+        });
+
+        // Common options for both charts
+        const commonOptions = {
+            responsive: true,
+            devicePixelRatio: Math.max(window.devicePixelRatio, 2), // Forces high-res crispness
+            scales: {
+                x: { title: { display: true, text: 'Time' } },
+                y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C)' } },
+                y1: { type: 'linear', position: 'right', title: { display: true, text: 'pH' }, grid: { drawOnChartArea: false } },
+                y2: { type: 'linear', position: 'right', title: { display: true, text: 'Turbidity (NTU)' }, grid: { drawOnChartArea: false } }
+            }
+        };
+
+        // --- Node A Chart ---
+        new Chart(ctxA, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [
-                    {
-                        label: 'Temperature (°C)',
-                        data: tempData,
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        tension: 0.3,
-                        yAxisID: 'y' 
-                    },
-                    {
-                        label: 'pH Level',
-                        data: phData,
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        tension: 0.3,
-                        yAxisID: 'y1' 
-                    },
-                    {
-                        label: 'Turbidity (NTU)',
-                        data: turbData,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        tension: 0.3,
-                        yAxisID: 'y2' 
-                    }
+                    { label: 'Temp A', data: getValues('Node A', 'temp'), borderColor: 'rgba(255, 99, 132, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y' },
+                    { label: 'pH A', data: getValues('Node A', 'ph'), borderColor: 'rgba(54, 162, 235, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y1' },
+                    { label: 'Turb A', data: getValues('Node A', 'turb'), borderColor: 'rgba(75, 192, 192, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y2' }
                 ]
             },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { title: { display: true, text: 'Time' } },
-                    y: { 
-                        type: 'linear', 
-                        display: true, 
-                        position: 'left',
-                        title: { display: true, text: 'Temperature (°C)' }
-                    },
-                    y1: { 
-                        type: 'linear', 
-                        display: true, 
-                        position: 'right',
-                        title: { display: true, text: 'pH Level' },
-                        grid: { drawOnChartArea: false } 
-                    },
-                    y2: { 
-                        type: 'linear', 
-                        display: true, 
-                        position: 'right',
-                        title: { display: true, text: 'Turbidity (NTU)' },
-                        grid: { drawOnChartArea: false } 
-                    }
-                }
-            }
+            options: commonOptions
+        });
+
+        // --- Node B Chart ---
+        new Chart(ctxB, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Temp B', data: getValues('Node B', 'temp'), borderColor: 'rgba(255, 159, 64, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y' },
+                    { label: 'pH B', data: getValues('Node B', 'ph'), borderColor: 'rgba(153, 102, 255, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y1' },
+                    { label: 'Turb B', data: getValues('Node B', 'turb'), borderColor: 'rgba(255, 205, 86, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+                ]
+            },
+            options: commonOptions
         });
     </script>
     {% else %}
