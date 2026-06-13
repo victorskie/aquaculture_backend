@@ -7,50 +7,60 @@ import joblib
 filename = "aquaculture_dataset_v2.csv"
 headers = ["temperature", "ph_level", "turbidity", "temp_delta", "ph_delta", "turb_delta", "is_safe"]
 
-print("1. Generating dataset with Percentage-Based Turbidity...")
+print("1. Generating dataset with Independent Failure Modes...")
 with open(filename, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(headers)
 
-    for _ in range(2500):
-        if random.random() < 0.60:
-            # SAFE: Normal values AND stable changes
+    # Increased dataset size for better accuracy
+    for _ in range(3000):
+        # -----------------------------------------
+        # SAFE CONDITION
+        # -----------------------------------------
+        if random.random() < 0.50:
             temp = round(random.uniform(25.0, 32.0), 2)
             ph = round(random.uniform(6.5, 8.5), 2)
-            turb = round(random.uniform(0.0, 20.0), 2) # SAFE: 0% to 20% Turbidity
+            turb = round(random.uniform(0.0, 20.0), 2) 
             
-            # Very small shifts between readings
             t_delta = round(random.uniform(-0.3, 0.3), 2)
             p_delta = round(random.uniform(-0.1, 0.1), 2)
             tu_delta = round(random.uniform(-1.0, 1.0), 2)
             is_safe = 1
-        else:
-            # FAILURE: Bad ranges OR dangerous spikes
-            fail_type = random.choice(['bad_range', 'rapid_spike'])
             
-            if fail_type == 'bad_range':
-                temp = round(random.choice([random.uniform(20.0, 24.5), random.uniform(32.5, 38.0)]), 2)
-                ph = round(random.choice([random.uniform(4.0, 6.2), random.uniform(8.8, 10.5)]), 2)
-                turb = round(random.uniform(35.0, 100.0), 2) # FAILURE: 35% to 100% Turbidity
+        # -----------------------------------------
+        # FAILURE CONDITION
+        # -----------------------------------------
+        else:
+            # Start with a safe baseline
+            temp = round(random.uniform(25.0, 32.0), 2)
+            ph = round(random.uniform(6.5, 8.5), 2)
+            turb = round(random.uniform(0.0, 20.0), 2)
+            
+            t_delta = round(random.uniform(-0.3, 0.3), 2)
+            p_delta = round(random.uniform(-0.1, 0.1), 2)
+            tu_delta = round(random.uniform(-1.0, 1.0), 2)
+
+            # Randomly decide WHICH parameter(s) will fail 
+            # (1 = Temp fails, 2 = pH fails, 3 = Turbidity fails, 4 = All fail)
+            fail_trigger = random.randint(1, 4)
+            
+            if fail_trigger in [1, 4]: 
+                # Temp drops below 25 or spikes above 32
+                temp = round(random.choice([random.uniform(0.0, 24.9), random.uniform(32.1, 50.0)]), 2)
                 
-                t_delta = round(random.uniform(-0.3, 0.3), 2)
-                p_delta = round(random.uniform(-0.1, 0.1), 2)
-                tu_delta = round(random.uniform(-1.0, 1.0), 2)
-            else:
-                # PREDICTIVE FAILURE: Spiking too fast
-                temp = round(random.uniform(25.0, 32.0), 2)
-                ph = round(random.uniform(6.5, 8.5), 2)
-                turb = round(random.uniform(15.0, 50.0), 2) 
+            if fail_trigger in [2, 4]: 
+                # pH drops below 6.5 or spikes above 8.5 (Covers 0 to 14)
+                ph = round(random.choice([random.uniform(0.0, 6.4), random.uniform(8.6, 14.0)]), 2)
                 
-                t_delta = round(random.choice([random.uniform(1.5, 3.0), random.uniform(-3.0, -1.5)]), 2)
-                p_delta = round(random.choice([random.uniform(0.5, 1.0), random.uniform(-1.0, -0.5)]), 2)
-                tu_delta = round(random.uniform(15.0, 40.0), 2) # Sudden +15% to +40% spike in dirtiness
+            if fail_trigger in [3, 4]: 
+                # Turbidity goes above 25%
+                turb = round(random.uniform(25.0, 100.0), 2)
                 
             is_safe = 0
 
         writer.writerow([temp, ph, turb, t_delta, p_delta, tu_delta, is_safe])
 
-print("2. Training Decision Tree on Percentage scale...")
+print("2. Training Decision Tree on Independent parameters...")
 df = pd.read_csv(filename)
 X = df[['temperature', 'ph_level', 'turbidity', 'temp_delta', 'ph_delta', 'turb_delta']]
 y = df['is_safe']
@@ -58,6 +68,5 @@ y = df['is_safe']
 model = DecisionTreeClassifier(random_state=42)
 model.fit(X, y)
 
-# Overwriting the existing V2 brain so views.py doesn't need to change
 joblib.dump(model, 'aquaculture_model_v2.pkl') 
 print("Success! Brain retrained and saved as 'aquaculture_model_v2.pkl'")
