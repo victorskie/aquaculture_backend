@@ -8,19 +8,23 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
         .header { text-align: center; margin-bottom: 20px; }
-        .node-alert { text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; padding: 10px; border-radius: 8px; background: #fff3cd; color: #856404; max-width: 400px; margin-left: auto; margin-right: auto; border: 1px solid #ffeeba; }
-        .grid { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 200px; text-align: center; }
-        .card h3 { margin: 0 0 10px 0; color: #666; font-size: 1.1rem; }
-        .card .value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
-        .status-safe { background-color: #d4edda; border: 2px solid #28a745; }
-        .status-danger { background-color: #f8d7da; border: 2px solid #dc3545; }
+        
+        /* New Global Banner Styles */
+        .global-banner { max-width: 860px; margin: 0 auto 30px auto; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .global-banner h2 { margin: 0 0 10px 0; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        .global-banner p { margin: 0; font-size: 1.1rem; }
+        .status-safe { background-color: #d4edda; border: 2px solid #28a745; color: #155724; }
+        .status-danger { background-color: #f8d7da; border: 2px solid #dc3545; color: #721c24; }
+        .status-danger p { font-weight: bold; }
+
         .charts-wrapper { display: flex; flex-direction: column; gap: 20px; max-width: 900px; margin: 0 auto 40px auto; }
         .chart-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;}
         .chart-title { text-align: center; margin-top: 0; color: #2c3e50; font-size: 1.2rem; }
         table { width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden;}
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #2c3e50; color: white; }
+        .row-safe { color: #28a745; font-weight: bold; }
+        .row-failure { color: #dc3545; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -30,35 +34,21 @@
         <p>Predictive Dual-Node Telemetry & AI Evaluation</p>
     </div>
 
-    {% if display_node %}
-    
-    <div class="node-alert">
-        Currently Displaying: {{ display_node.node_name }}
-    </div>
+    <!-- 1. The New Global AI Decision Banner -->
+    {% if system_status == 'WARNING' %}
+        <div class="global-banner status-danger">
+            <h2>System Warning: Water Change Initiated</h2>
+            <p>Triggered by: {{ failure_reasons }}</p>
+        </div>
+    {% else %}
+        <div class="global-banner status-safe">
+            <h2>System Optimal</h2>
+            <p>All nodes and environmental parameters are within safe limits.</p>
+        </div>
+    {% endif %}
 
-    <div class="grid">
-        <div class="card">
-            <h3>Temperature</h3>
-            <div class="value">{{ display_node.temperature }} °C</div>
-        </div>
-        <div class="card">
-            <h3>pH Level</h3>
-            <div class="value">{{ display_node.ph_level }}</div>
-        </div>
-        <div class="card">
-            <h3>Turbidity</h3>
-            <div class="value">{{ display_node.turbidity }} %</div>
-        </div>
-        
-        <div class="card {% if display_node.is_safe %}status-safe{% else %}status-danger{% endif %}">
-            <h3>AI System Status</h3>
-            <div class="value">
-                {% if display_node.is_safe %}SAFE{% else %}WARNING{% endif %}
-            </div>
-        </div>
-    </div>
-
-    <div class="card" style="width: 100%; max-width: 860px; margin: 0 auto 30px auto; display: flex; justify-content: space-between; align-items: center; text-align: left;">
+    <!-- 2. Manual Override Control (Master Node) - Exactly as provided -->
+    <div class="card" style="width: 100%; max-width: 860px; margin: 0 auto 30px auto; display: flex; justify-content: space-between; align-items: center; text-align: left; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); box-sizing: border-box;">
         <div>
             <h3 style="margin: 0; color: #2c3e50;">Manual Override Control (Master Node)</h3>
             <p style="margin: 5px 0 0 0; color: #666; font-size: 0.95rem;">Initiate a 5-second relay sequence on GPIO 32.</p>
@@ -74,6 +64,7 @@
         </form>
     </div>
 
+    <!-- 3. Telemetry Trend Graphs -->
     <div class="charts-wrapper">
         <div class="chart-container">
             <h3 class="chart-title">Node A Telemetry</h3>
@@ -85,6 +76,7 @@
         </div>
     </div>
 
+    <!-- 4. Historical Log Table (Keeps Node-Specific Status) -->
     <table>
         <thead>
             <tr>
@@ -104,7 +96,9 @@
                 <td>{{ reading.temperature }}</td>
                 <td>{{ reading.ph_level }}</td>
                 <td>{{ reading.turbidity }}</td>
-                <td>{% if reading.is_safe %}Safe{% else %}Failure{% endif %}</td>
+                <td class="{% if reading.is_safe %}row-safe{% else %}row-failure{% endif %}">
+                    {% if reading.is_safe %}Safe{% else %}Failure{% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -118,7 +112,7 @@
         Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
         Chart.defaults.font.size = 11;
 
-        // 1. Extract and format the raw data from Django
+        // Extract and format the raw data from Django
         const rawData = [
             {% for r in history reversed %}
             { 
@@ -131,10 +125,10 @@
             {% endfor %}
         ];
 
-        // 2. Get unique timestamps for the X-axis
+        // Get unique timestamps for the X-axis
         const labels = [...new Set(rawData.map(d => d.time))];
 
-        // 3. Helper function to map values
+        // Helper function to map values
         const getValues = (nodeName, key) => labels.map(label => {
             const match = rawData.find(d => d.time === label && d.node === nodeName);
             return match ? match[key] : null;
@@ -143,7 +137,7 @@
         // Common options for both charts
         const commonOptions = {
             responsive: true,
-            devicePixelRatio: Math.max(window.devicePixelRatio, 2), // Forces high-res crispness
+            devicePixelRatio: Math.max(window.devicePixelRatio, 2),
             scales: {
                 x: { title: { display: true, text: 'Time' } },
                 y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C)' } },
@@ -152,7 +146,7 @@
             }
         };
 
-        // --- Node A Chart ---
+        // Node A Chart
         new Chart(ctxA, {
             type: 'line',
             data: {
@@ -166,7 +160,7 @@
             options: commonOptions
         });
 
-        // --- Node B Chart ---
+        // Node B Chart
         new Chart(ctxB, {
             type: 'line',
             data: {
@@ -180,9 +174,5 @@
             options: commonOptions
         });
     </script>
-    {% else %}
-        <p style="text-align: center;">No sensor data received yet. Waiting for ESP32 telemetry...</p>
-    {% endif %}
-
 </body>
 </html>

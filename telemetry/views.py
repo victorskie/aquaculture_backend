@@ -77,6 +77,20 @@ def upload_data(request):
     return JsonResponse({"status": "error", "message": "Only POST requests allowed"}, status=405)
 
 
+# --- HELPER FUNCTION FOR DASHBOARD LOGIC ---
+def has_parameter_failure(node):
+    """
+    Checks if a node's physical readings are outside safe biological limits.
+    Adjust these limits as needed for your specific fish species.
+    """
+    if not node:
+        return False
+    # Example safe ranges: Temp (20.0 - 35.0 °C), pH (6.5 - 8.5), Turbidity (< 50.0 %)
+    if not (20.0 <= node.temperature <= 35.0): return True
+    if not (6.5 <= node.ph_level <= 8.5): return True
+    if node.turbidity >= 50.0: return True
+    return False
+
 def dashboard(request):
     config, created = SystemConfiguration.objects.get_or_create(id=1)
 
@@ -90,23 +104,37 @@ def dashboard(request):
     latest_a = SensorReading.objects.filter(node_name="Node A").order_by('-timestamp').first()
     latest_b = SensorReading.objects.filter(node_name="Node B").order_by('-timestamp').first()
 
-    # --- WORST CASE DISPLAY LOGIC ---
-    # We default to showing Node A. But if Node B is in danger and A is not, we swap the display to B!
-    display_node = latest_a 
-    
-    if latest_b is not None:
-        if latest_a is None:
-            display_node = latest_b
-        elif not latest_b.is_safe and latest_a.is_safe:
-            display_node = latest_b
-            
+    # --- GLOBAL AI DECISION LOGIC ---
+    reasons = []
+    system_status = "SAFE"
+
+    # Evaluate Node A
+    if latest_a and not latest_a.is_safe:
+        if has_parameter_failure(latest_a):
+            reasons.append("Node A Parameter Failure")
+        else:
+            reasons.append("Node A Rapid Rate of Change (Delta Warning)")
+
+    # Evaluate Node B
+    if latest_b and not latest_b.is_safe:
+        if has_parameter_failure(latest_b):
+            reasons.append("Node B Parameter Failure")
+        else:
+            reasons.append("Node B Rapid Rate of Change (Delta Warning)")
+
+    # Determine Overall System Status
+    if reasons:
+        system_status = "WARNING"
+        failure_reasons_str = " | ".join(reasons)
+    else:
+        failure_reasons_str = ""
+
     # Fetch the last 20 readings for the graph/table (10 from A, 10 from B)
     recent_readings = SensorReading.objects.all().order_by('-timestamp')[:20]
     
     context = {
-        'display_node': display_node,
-        'latest_a': latest_a,
-        'latest_b': latest_b,
+        'system_status': system_status,
+        'failure_reasons': failure_reasons_str,
         'history': recent_readings,
         'water_change_requested': config.water_change_requested
     }
