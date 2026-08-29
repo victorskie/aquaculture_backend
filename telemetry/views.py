@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .models import SensorReading, SystemConfiguration
+from django.http import HttpResponse
 
 # Load the NEW V2 trained ML model
 MODEL_PATH = os.path.join(settings.BASE_DIR, 'aquaculture_model_v2.pkl')
@@ -140,3 +141,6 @@ def dashboard(request):
     }
     
     return render(request, 'telemetry/dashboard.html', context)
+
+def ping(request):
+    return HttpResponse("OK")
