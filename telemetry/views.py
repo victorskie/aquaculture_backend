@@ -2,7 +2,7 @@ import json
 import os
 import joblib
 import pandas as pd
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -157,14 +157,6 @@ def offending_parameters(reading):
 
 
 def dashboard(request):
-    config, created = SystemConfiguration.objects.get_or_create(id=1)
-
-    # Listen for the manual override button
-    if request.method == 'POST' and 'toggle_water_change' in request.POST:
-        config.water_change_requested = True
-        config.save()
-        return redirect('dashboard')
-
     # The verdict was decided at ingest and stored on the row; read it, don't redo it.
     failure_reasons = []
     forecast_nodes = []
@@ -195,7 +187,6 @@ def dashboard(request):
         'forecast_nodes': " and ".join(forecast_nodes),
         'horizon_minutes': rules.HORIZON_MINUTES,
         'history': recent_readings,
-        'water_change_requested': config.water_change_requested
     }
 
     return render(request, 'telemetry/dashboard.html', context)
