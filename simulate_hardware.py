@@ -17,7 +17,8 @@ def clamp_delta(target, current, max_delta):
     return target
 
 def generate_presentation_data():
-    print("Starting rapid data injection to Render Backend (10 total readings)...")
+    print("Starting data injection to Render Backend (10 total readings)...")
+    print("NOTE: This script will take 1 hour to complete due to the 15-minute intervals.\n")
     
     # Track previous state to enforce delta limits
     prev_a = {"temp": None, "ph": None, "turb": None}
@@ -90,9 +91,10 @@ def generate_presentation_data():
             except Exception as e:
                 print(f"Failed to send: {e}")
             
-            # 1-second pause to prevent simultaneous database timestamp collisions
             time.sleep(1) 
             
-        print("\n[SYSTEM] Moving to the next reading cycle...\n")
+        if i < 4:
+            print("\n[SYSTEM] Waiting 15 minutes before the next reading cycle...\n")
+            time.sleep(900) 
 
 generate_presentation_data()
