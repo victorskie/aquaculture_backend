@@ -7,7 +7,20 @@ class SensorReading(models.Model):
     temperature = models.FloatField()
     ph_level = models.FloatField()
     turbidity = models.FloatField()
-    is_safe = models.BooleanField(null=True, blank=True)
+
+    temp_delta = models.FloatField(null=True, blank=True)
+    ph_delta = models.FloatField(null=True, blank=True)
+    turb_delta = models.FloatField(null=True, blank=True)
+    after_gap = models.BooleanField(default=False)
+
+    is_safe = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Verdict of the safety rule at the moment of the reading, not a model prediction.",
+    )
+    failure_type = models.CharField(max_length=16, null=True, blank=True)
+    will_fail_60min = models.BooleanField(null=True, blank=True)
+
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
