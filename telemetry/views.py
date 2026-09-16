@@ -12,7 +12,7 @@ from .models import SensorReading, SystemConfiguration
 from . import rules
 from django.http import HttpResponse
 
-# Column names and order as used in train_model.py. Predictions are passed as a
+# Column names and order as used in train_model_v3.py. Predictions are passed as a
 # named DataFrame so a mismatch raises instead of silently binding values to the
 # wrong features by position.
 FEATURE_NAMES = ['temperature', 'ph_level', 'turbidity',
