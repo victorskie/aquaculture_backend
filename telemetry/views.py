@@ -41,63 +41,96 @@ CYCLE_TOLERANCE_MINUTES = 3
 MIN_GAP_MINUTES = rules.CYCLE_MINUTES - CYCLE_TOLERANCE_MINUTES
 MAX_GAP_MINUTES = rules.CYCLE_MINUTES + CYCLE_TOLERANCE_MINUTES
 
+
+def ingest_reading(node_name, temperature, ph_level, turbidity, timestamp=None):
+    """Derive and store one reading. The single path by which readings are made.
+
+    Returns the saved SensorReading.
+
+    `timestamp` is for backfilling a reading at a known past time; it must be
+    timezone-aware. Left None, the reading happens now, which is what a live
+    upload does. Everything else is identical either way, so a replayed reading
+    gets its verdict and forecast exactly as a live one would.
+    """
+    at = timestamp if timestamp is not None else timezone.now()
+
+    # 1. Fetch the exact last reading for THIS specific node, before this one.
+    prev_reading = (
+        SensorReading.objects
+        .filter(node_name=node_name, timestamp__lt=at)
+        .order_by('-timestamp')
+        .first()
+    )
+
+    # 2. A delta is only a rate of change if the previous reading is one
+    #    cycle old. A missed cycle makes the difference span an unknown
+    #    stretch of time, so it is not comparable to a trained-on delta.
+    temp_delta = ph_delta = turb_delta = None
+    after_gap = True
+    if prev_reading:
+        gap_minutes = (at - prev_reading.timestamp).total_seconds() / 60.0
+        if MIN_GAP_MINUTES <= gap_minutes <= MAX_GAP_MINUTES:
+            temp_delta = round(temperature - prev_reading.temperature, 2)
+            ph_delta = round(ph_level - prev_reading.ph_level, 2)
+            turb_delta = round(turbidity - prev_reading.turbidity, 2)
+            after_gap = False
+
+    # 3. The verdict for right now comes from the rule, never the model.
+    is_safe, failure_type = rules.classify(
+        temperature, ph_level, turbidity, temp_delta, ph_delta, turb_delta
+    )
+
+    # 4. The model forecasts the next hour. It needs all six features, so
+    #    it sits out a gap; and there is nothing to forecast for water
+    #    that has already failed.
+    will_fail_60min = None
+    if ml_model is not None and not after_gap and is_safe:
+        features = pd.DataFrame(
+            [[temperature, ph_level, turbidity, temp_delta, ph_delta, turb_delta]],
+            columns=FEATURE_NAMES,
+        )
+        will_fail_60min = bool(ml_model.predict(features)[0])
+
+    # 5. Save the new reading to the database, including the node name
+    reading = SensorReading.objects.create(
+        node_name=node_name,
+        temperature=temperature,
+        ph_level=ph_level,
+        turbidity=turbidity,
+        temp_delta=temp_delta,
+        ph_delta=ph_delta,
+        turb_delta=turb_delta,
+        after_gap=after_gap,
+        is_safe=is_safe,
+        failure_type=failure_type,
+        will_fail_60min=will_fail_60min,
+    )
+
+    if timestamp is not None:
+        # SensorReading.timestamp is auto_now_add, so the insert stamped it with
+        # now. A queryset update bypasses that and backdates it for real.
+        SensorReading.objects.filter(pk=reading.pk).update(timestamp=at)
+        reading.timestamp = at
+
+    return reading
+
+
 @csrf_exempt
 def upload_data(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             # Default to Node A if your test script hasn't been updated to send a name yet
-            node_name = data.get('node_name', 'Node A') 
+            node_name = data.get('node_name', 'Node A')
             temp = float(data['temperature'])
             ph = float(data['ph_level'])
             turb = float(data['turbidity'])
-            
-            # 1. Fetch the exact last reading for THIS specific node
-            prev_reading = SensorReading.objects.filter(node_name=node_name).order_by('-timestamp').first()
 
-            # 2. A delta is only a rate of change if the previous reading is one
-            #    cycle old. A missed cycle makes the difference span an unknown
-            #    stretch of time, so it is not comparable to a trained-on delta.
-            temp_delta = ph_delta = turb_delta = None
-            after_gap = True
-            if prev_reading:
-                gap_minutes = (timezone.now() - prev_reading.timestamp).total_seconds() / 60.0
-                if MIN_GAP_MINUTES <= gap_minutes <= MAX_GAP_MINUTES:
-                    temp_delta = round(temp - prev_reading.temperature, 2)
-                    ph_delta = round(ph - prev_reading.ph_level, 2)
-                    turb_delta = round(turb - prev_reading.turbidity, 2)
-                    after_gap = False
-
-            # 3. The verdict for right now comes from the rule, never the model.
-            is_safe, failure_type = rules.classify(
-                temp, ph, turb, temp_delta, ph_delta, turb_delta
-            )
-
-            # 4. The model forecasts the next hour. It needs all six features, so
-            #    it sits out a gap; and there is nothing to forecast for water
-            #    that has already failed.
-            will_fail_60min = None
-            if ml_model is not None and not after_gap and is_safe:
-                features = pd.DataFrame(
-                    [[temp, ph, turb, temp_delta, ph_delta, turb_delta]],
-                    columns=FEATURE_NAMES,
-                )
-                will_fail_60min = bool(ml_model.predict(features)[0])
-
-            # 5. Save the new reading to the database, including the node name
-            SensorReading.objects.create(
-                node_name=node_name,
-                temperature=temp,
-                ph_level=ph,
-                turbidity=turb,
-                temp_delta=temp_delta,
-                ph_delta=ph_delta,
-                turb_delta=turb_delta,
-                after_gap=after_gap,
-                is_safe=is_safe,
-                failure_type=failure_type,
-                will_fail_60min=will_fail_60min,
-            )
+            reading = ingest_reading(node_name, temp, ph, turb)
+            is_safe = reading.is_safe
+            failure_type = reading.failure_type
+            after_gap = reading.after_gap
+            will_fail_60min = reading.will_fail_60min
 
             # --- POLLING LOGIC FOR RELAY OVERRIDE ---
             config, created = SystemConfiguration.objects.get_or_create(id=1)
@@ -130,6 +163,11 @@ FAILURE_LABELS = {
     'parameter': "Parameter failure",
     'rate': "Rapid rate-of-change failure",
 }
+
+# Readings per node on the trend graphs. At one reading per cycle this is about
+# a day, enough to show a trend rather than a handful of dots. The history table
+# below the graphs stays at 10 rows; the template slices it.
+GRAPH_POINTS = 96
 
 
 def offending_parameters(reading):
@@ -178,8 +216,20 @@ def dashboard(request):
     else:
         banner_state = 'optimal'
 
-    # Fetch the last 20 readings for the graph/table (10 from A, 10 from B)
-    recent_readings = SensorReading.objects.all().order_by('-timestamp')[:20]
+    # Enough points for the trend to be readable rather than a handful of dots.
+    # Fetched per node so one busy node cannot crowd the other out of the graph.
+    # The template slices this same list down to 10 rows for the history table.
+    recent_readings = sorted(
+        (
+            reading
+            for node_name in NODE_NAMES
+            for reading in SensorReading.objects.filter(
+                node_name=node_name
+            ).order_by('-timestamp')[:GRAPH_POINTS]
+        ),
+        key=lambda r: r.timestamp,
+        reverse=True,
+    )
 
     context = {
         'banner_state': banner_state,

@@ -130,7 +130,12 @@
         const rawData = [
             {% for r in history reversed %}
             { 
-                time: "{{ r.timestamp|time:'H:i:s' }}", 
+                {% comment %}
+                    Labels key the series together and must be unique. A day of
+                    readings plus any gap spans more than 24h, so a time-only
+                    label would collide and silently merge two points.
+                {% endcomment %}
+                time: "{{ r.timestamp|date:'d M H:i' }}",
                 node: "{{ r.node_name }}", 
                 temp: {{ r.temperature }}, 
                 ph: {{ r.ph_level }}, 
