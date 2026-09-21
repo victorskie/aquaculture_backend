@@ -86,10 +86,10 @@ def has_parameter_failure(node):
     """
     if not node:
         return False
-    # Example safe ranges: Temp (20.0 - 35.0 °C), pH (6.5 - 8.5), Turbidity (< 50.0 %)
-    if not (20.0 <= node.temperature <= 35.0): return True
+    # Safe ranges: Temp (25.0 - 32.0 °C), pH (6.5 - 8.5), Turbidity (<= 25.0 %)
+    if not (25.0 <= node.temperature <= 32.0): return True
     if not (6.5 <= node.ph_level <= 8.5): return True
-    if node.turbidity >= 50.0: return True
+    if node.turbidity > 25.0: return True
     return False
 
 def dashboard(request):
