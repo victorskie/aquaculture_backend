@@ -165,9 +165,9 @@ FAILURE_LABELS = {
 }
 
 # Readings per node on the trend graphs. At one reading per cycle this is about
-# a day, enough to show a trend rather than a handful of dots. The history table
-# below the graphs stays at 10 rows; the template slices it.
-GRAPH_POINTS = 96
+# six hours. The history table below the graphs stays at 10 rows; the template
+# slices it.
+GRAPH_POINTS = 24
 
 
 def offending_parameters(reading):

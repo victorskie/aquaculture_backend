@@ -131,11 +131,13 @@
             {% for r in history reversed %}
             { 
                 {% comment %}
-                    Labels key the series together and must be unique. A day of
-                    readings plus any gap spans more than 24h, so a time-only
-                    label would collide and silently merge two points.
+                    Labels key the two nodes' series together and must be unique
+                    within the window. At views.GRAPH_POINTS readings per node
+                    the window is well under 24h, so the time alone is enough.
+                    Widen the graph past a day and this needs the date back, or
+                    two readings will share a label and silently merge.
                 {% endcomment %}
-                time: "{{ r.timestamp|date:'d M H:i' }}",
+                time: "{{ r.timestamp|date:'H:i' }}",
                 node: "{{ r.node_name }}", 
                 temp: {{ r.temperature }}, 
                 ph: {{ r.ph_level }}, 
