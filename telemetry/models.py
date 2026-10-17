@@ -23,6 +23,17 @@ class SensorReading(models.Model):
 
     timestamp = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def transparency_cm(self):
+        """Secchi transparency equivalent of the stored turbidity percentage.
+
+        Display only. The turbidity field remains the stored quantity and is
+        what the safety rule is applied to; this converts it for presentation
+        using D = 0.40 x (100 - T), the relation fixed by the 40 cm Secchi
+        tube used during calibration.
+        """
+        return round(0.40 * (100 - self.turbidity), 1)
+
     def __str__(self):
         return f"{self.node_name} - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 

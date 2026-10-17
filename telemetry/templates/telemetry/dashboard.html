@@ -84,7 +84,7 @@
                 <th>Location</th>
                 <th>Temp (°C)</th>
                 <th>pH</th>
-                <th>Turbidity (%)</th>
+                <th>Transparency (cm)</th>
                 <th>Verdict</th>
                 <th>Forecast ({{ horizon_minutes }} min)</th>
             </tr>
@@ -96,7 +96,7 @@
                 <td><strong>{{ reading.node_name }}</strong></td>
                 <td>{{ reading.temperature }}</td>
                 <td>{{ reading.ph_level }}</td>
-                <td>{{ reading.turbidity }}</td>
+                <td>{{ reading.transparency_cm }}</td>
                 <td class="{% if reading.is_safe %}row-safe{% else %}row-failure{% endif %}">
                     {% if reading.is_safe %}
                         Safe
@@ -141,7 +141,7 @@
                 node: "{{ r.node_name }}", 
                 temp: {{ r.temperature }}, 
                 ph: {{ r.ph_level }}, 
-                turb: {{ r.turbidity }} 
+                turb: {{ r.transparency_cm }} 
             },
             {% endfor %}
         ];
@@ -163,7 +163,7 @@
                 x: { title: { display: true, text: 'Time' } },
                 y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C)' } },
                 y1: { type: 'linear', position: 'right', title: { display: true, text: 'pH' }, grid: { drawOnChartArea: false } },
-                y2: { type: 'linear', position: 'right', title: { display: true, text: 'Turbidity (%)' }, grid: { drawOnChartArea: false } }
+                y2: { type: 'linear', position: 'right', title: { display: true, text: 'Transparency (cm)' }, grid: { drawOnChartArea: false } }
             }
         };
 
@@ -175,7 +175,7 @@
                 datasets: [
                     { label: 'Temp A', data: getValues('Node A', 'temp'), borderColor: 'rgba(255, 99, 132, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y' },
                     { label: 'pH A', data: getValues('Node A', 'ph'), borderColor: 'rgba(54, 162, 235, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y1' },
-                    { label: 'Turb A (%)', data: getValues('Node A', 'turb'), borderColor: 'rgba(75, 192, 192, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+                    { label: 'Transparency A (cm)', data: getValues('Node A', 'turb'), borderColor: 'rgba(75, 192, 192, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y2' }
                 ]
             },
             options: commonOptions
@@ -189,7 +189,7 @@
                 datasets: [
                     { label: 'Temp B', data: getValues('Node B', 'temp'), borderColor: 'rgba(255, 159, 64, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y' },
                     { label: 'pH B', data: getValues('Node B', 'ph'), borderColor: 'rgba(153, 102, 255, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y1' },
-                    { label: 'Turb B (%)', data: getValues('Node B', 'turb'), borderColor: 'rgba(255, 205, 86, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y2' }
+                    { label: 'Transparency B (cm)', data: getValues('Node B', 'turb'), borderColor: 'rgba(255, 205, 86, 1)', spanGaps: true, tension: 0.3, yAxisID: 'y2' }
                 ]
             },
             options: commonOptions
